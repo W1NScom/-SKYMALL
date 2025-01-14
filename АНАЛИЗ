@@ -1,0 +1,82 @@
+function onEdit(e) {
+  // Проверяем, что изменение произошло на листе TEST и в объединённых ячейках D1:O1
+  var range = e.range;
+  var sheet = e.source.getActiveSheet();
+
+  if (sheet.getName() === "АНАЛИЗ" && range.getA1Notation() === "D1") {
+    var newDate = range.getValue(); // Получаем новую дату
+    if (newDate) {
+      var testSheet = e.source.getSheetByName("АНАЛИЗ");
+      testSheet.getRange("B3").setValue("АНАЛИЗ ДАННЫХ..."); // Указываем статус
+      SpreadsheetApp.flush(); // Применяем изменения
+      markWithEmojiAndColorOptimized(newDate); // Запускаем анализ
+      testSheet.getRange("B3").setValue("ГОТОВО"); // Указываем, что анализ завершён
+    }
+  }
+}
+
+function markWithEmojiAndColorOptimized(analysisDate) {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var testSheet = spreadsheet.getSheetByName("АНАЛИЗ");
+
+  if (!analysisDate) {
+    testSheet.getRange("B3").setValue("Ошибка: Укажите дату в D1.");
+    return;
+  }
+
+  // **ПОДГОТОВКА**: Считываем все листы PS в массив
+  var repeatCounts = Array(16).fill(0); // Подсчёт совпадений по каждому PS-листу
+  var timesToMark = Array(16).fill(null).map(() => ({})); // Времена для каждого листа PS
+
+  for (var i = 1; i <= 16; i++) {
+    var psSheet = spreadsheet.getSheetByName("PS" + i);
+    if (!psSheet) continue;
+
+    var psData = psSheet.getRange(3, 1, psSheet.getLastRow() - 2, 2).getValues(); // Даты и время
+
+    for (var j = 0; j < psData.length; j++) {
+      var psDate = psData[j][0];
+      var psTime = psData[j][1];
+
+      if (psDate && psTime && psDate.getTime() === analysisDate.getTime()) {
+        repeatCounts[i - 1]++;
+        var formattedTime = typeof psTime === 'object'
+          ? Utilities.formatDate(psTime, Session.getScriptTimeZone(), "HH:mm")
+          : psTime.split(":").slice(0, 2).join(":");
+        timesToMark[i - 1][formattedTime] = true; // Используем объект для быстрого поиска
+      }
+    }
+  }
+
+  // **ОБРАБОТКА**: Генерация времени (00:00 - 23:59)
+  var timeIntervals = [];
+  for (var hour = 0; hour < 24; hour++) {
+    for (var minute = 0; minute < 60; minute++) {
+      var formattedTime = Utilities.formatString("%02d:%02d", hour, minute);
+      timeIntervals.push(formattedTime);
+    }
+  }
+
+  // **ЗАПОЛНЕНИЕ**: Подготовка данных для записи
+  var rowsData = Array(timeIntervals.length).fill(null).map(() => Array(16).fill(""));
+  var colors = Array(timeIntervals.length).fill(null).map(() => Array(16).fill(null));
+
+  for (var i = 0; i < timeIntervals.length; i++) {
+    for (var psIndex = 0; psIndex < 16; psIndex++) {
+      if (timesToMark[psIndex][timeIntervals[i]]) {
+        rowsData[i][psIndex] = "🎳";
+        colors[i][psIndex] = "#dc143c"; // Красный цвет
+      }
+    }
+  }
+
+  // **ЗАПИСЬ**: Устанавливаем значения и цвета одним запросом
+  testSheet.getRange(4, 3, rowsData.length, 16).setValues(rowsData); // Устанавливаем 🎳
+  testSheet.getRange(4, 3, colors.length, 16).setBackgrounds(colors); // Устанавливаем цвета
+
+  // **ЗАПИСЬ ПОДСЧЁТА**: Устанавливаем повторения
+  testSheet.getRange("C3:R3").setValues([repeatCounts]);
+
+  // **ИНФОРМАЦИЯ**: Записываем логи
+  Logger.log("Анализ завершён. Количество совпадений: " + repeatCounts.join(", "));
+} 
