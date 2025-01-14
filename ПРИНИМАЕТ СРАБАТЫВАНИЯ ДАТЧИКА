@@ -1,0 +1,75 @@
+function doGet(e) {
+  // Проверяем, переданы ли необходимые параметры
+  if (!e.parameter.sheet || !e.parameter.button || !e.parameter.wifiStatus) {
+    return ContentService.createTextOutput("Ошибка: отсутствуют параметры sheet, button или wifiStatus.")
+      .setMimeType(ContentService.MimeType.TEXT);
+  }
+
+  // Получаем параметры из запроса
+  var sheetName = e.parameter.sheet; // Название листа
+  var buttonValue = e.parameter.button; // Значение кнопки (или датчика)
+  var wifiStatus = e.parameter.wifiStatus; // Уровень сигнала WiFi
+
+  // Подключаемся к Google Таблице
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = spreadsheet.getSheetByName(sheetName);
+
+  // Проверяем существование листа
+  if (!sheet) {
+    return ContentService.createTextOutput("Ошибка: Лист с именем '" + sheetName + "' не найден.")
+      .setMimeType(ContentService.MimeType.TEXT);
+  }
+
+  // Карта символов для уровня WiFi
+  var wifiSymbols = {
+    "1": "● ● ● ● ●", // Отличный сигнал
+    "2": "● ● ● ● ○", // Хороший сигнал
+    "3": "● ● ● ○ ○", // Средний сигнал
+    "4": "● ● ○ ○ ○", // Плохой сигнал
+    "5": "● ○ ○ ○ ○", // Очень плохой сигнал
+    "6": "○ ○ ○ ○ ○"  // Нет соединения
+  };
+
+  // Получаем символы на основе wifiStatus
+  var wifiSymbol = wifiSymbols[wifiStatus] || "○ ○ ○ ○ ○"; // Если статус неизвестен
+
+  // Получаем текущие дату и время
+  var date = new Date();
+  var dateString = Utilities.formatDate(date, Session.getScriptTimeZone(), "dd.MM.yyyy");
+  var timeString = Utilities.formatDate(date, Session.getScriptTimeZone(), "HH:mm:ss");
+
+  // Вставляем новую строку в начале данных (строка 3)
+  sheet.insertRowBefore(3);
+  sheet.getRange(3, 1).setValue(dateString); // Дата (колонка A)
+  sheet.getRange(3, 2).setValue(timeString); // Время (колонка B)
+  sheet.getRange(3, 3).setValue(buttonValue); // Значение кнопки/датчика (колонка C)
+  sheet.getRange(3, 4).setValue(wifiSymbol); // Символы уровня WiFi (колонка D)
+
+  // Добавляем формулу для суммирования в ячейку C2
+  sheet.getRange("C2").setFormula("=SUM(C3:C)");
+
+  // Добавляем формулы на все листы, связанные с PS
+  updateAllPSFormulas();
+
+  // Возвращаем успешный ответ
+  return ContentService.createTextOutput("Данные успешно добавлены в лист '" + sheetName + "' и формулы обновлены.")
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
+// Функция для обновления формул суммирования на всех листах PS
+function updateAllPSFormulas() {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = spreadsheet.getSheets();
+
+  // Проходимся по всем листам
+  for (var i = 0; i < sheets.length; i++) {
+    var sheet = sheets[i];
+    var sheetName = sheet.getName();
+
+    // Проверяем, начинается ли имя листа с "PS"
+    if (sheetName.startsWith("PS")) {
+      // Добавляем формулу суммирования в ячейку C2
+      sheet.getRange("C2").setFormula("=SUM(C3:C)");
+    }
+  }
+}
