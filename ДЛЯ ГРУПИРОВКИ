@@ -1,0 +1,20 @@
+function collapseAllGroups() {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Проходим по листам PS1 - PS16
+  for (var i = 1; i <= 16; i++) {
+    var sheetName = "PS" + i;
+    var sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) continue; // Пропускаем, если лист не найден
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 3) continue; // Пропускаем, если данных мало
+
+    // Сворачиваем все группы строк на листе
+    var range = sheet.getRange(3, 1, lastRow - 2, 1); // Строки с 3 по последнюю
+    range.collapseGroups(); // Сворачиваем все группы строк
+  }
+
+  SpreadsheetApp.flush(); // Обновляем таблицу
+  Logger.log("Все группы строк свернуты.");
+}
