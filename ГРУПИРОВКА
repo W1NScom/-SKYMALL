@@ -1,0 +1,54 @@
+function groupPreviousDayAtTop() {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Получаем текущую дату и вычисляем предыдущий день
+  var today = new Date();
+  var yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  var yesterdayString = Utilities.formatDate(yesterday, Session.getScriptTimeZone(), "dd.MM.yyyy");
+
+  // Проходим по листам PS1 - PS16
+  for (var i = 1; i <= 16; i++) {
+    var sheetName = "PS" + i;
+    var sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) continue; // Пропускаем, если лист не найден
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 3) continue; // Пропускаем, если данных мало
+
+    var dataRange = sheet.getRange(3, 1, lastRow - 2, 1); // Колонка A со строк 3 и ниже
+    var data = dataRange.getValues();
+
+    var firstRowOfPreviousDay = null;
+    var lastRowOfPreviousDay = null;
+
+    // Ищем первую и последнюю строки с предыдущей датой
+    for (var j = 0; j < data.length; j++) {
+      var currentDate = data[j][0]; // Дата в ячейке
+      if (!currentDate) continue;
+      var formattedDate = Utilities.formatDate(new Date(currentDate), Session.getScriptTimeZone(), "dd.MM.yyyy");
+
+      if (formattedDate === yesterdayString) {
+        if (!firstRowOfPreviousDay) {
+          firstRowOfPreviousDay = j + 3; // Первая строка предыдущего дня
+        }
+        lastRowOfPreviousDay = j + 3; // Обновляем последнюю строку
+      }
+    }
+
+    // Если найдены строки с предыдущей датой
+    if (firstRowOfPreviousDay && lastRowOfPreviousDay) {
+      var numRowsToGroup = lastRowOfPreviousDay - firstRowOfPreviousDay + 1;
+
+      if (numRowsToGroup > 1) {
+        // Добавляем группировку начиная со второй строки до конца
+        sheet.getRange(firstRowOfPreviousDay + 1, 1, numRowsToGroup - 1).shiftRowGroupDepth(1); // Группируем строки со второй до последней
+      }
+
+      
+    }
+  }
+
+  SpreadsheetApp.flush(); // Обновление таблицы
+  Logger.log("Группировка завершена для предыдущего дня.");
+}
